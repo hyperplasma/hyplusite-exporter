@@ -29,7 +29,7 @@ All posts are listed in a CSV file  `data/posts.csv` with the following columns:
 
 | url | title | category | subcategory |
 |-----|-------|----------|-------------|
-| https://www.hyperplasma.top/xxx | My Post Title | tech | python |
+| `https://www.hyperplasma.top/xxx` | My Post Title | tech | python |
 
 Run the downloader:
 
