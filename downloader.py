@@ -22,7 +22,7 @@ class Post:
         return path
 
 async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_timeout=30000):
-    """Asynchronously save a single webpage to an HTML file."""
+    """Asynchronously save a single webpage to an HTML file, with 503 detection."""
     save_path = post.get_save_path(output_dir)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     if save_path.exists():
@@ -35,7 +35,13 @@ async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_t
         )
         page = await context.new_page()
         page.set_default_timeout(page_timeout)
-        await page.goto(post.url, wait_until='domcontentloaded')
+        # Detect 503 status
+        response = await page.goto(post.url, wait_until='domcontentloaded')
+        if response and response.status == 503:
+            await context.close()
+            msg = f"503 Service Unavailable detected for {post.url}. This may be due to rate limiting or server protection."
+            log_error(post, msg)
+            return f"Download failed (503): {post.url}"
         try:
             await page.wait_for_selector('article', timeout=5000)
         except:
@@ -135,7 +141,7 @@ async def download_webpages_async(
                     progress_file.write_text(str(last_index + i + len(batch)), encoding='utf-8')
                     pbar.update(len(batch))
                     for result in results:
-                        if result.startswith("Download failed"):
+                        if "503" in result or result.startswith("Download failed"):
                             print(f"\n{result}")
             await browser.close()
     except KeyboardInterrupt:
