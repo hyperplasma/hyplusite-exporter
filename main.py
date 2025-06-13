@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument(
         '--page-timeout',
         type=int,
-        default=30000,
+        default=50000,
         help='Page load timeout (milliseconds)'
     )
     parser.add_argument(
