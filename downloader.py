@@ -5,6 +5,9 @@ import datetime
 import asyncio
 from playwright.async_api import async_playwright
 from tqdm import tqdm
+import requests
+from bs4 import BeautifulSoup
+import hashlib
 
 class Post:
     def __init__(self, url, title, category, subcategory=None):
@@ -21,8 +24,27 @@ class Post:
             path = Path(base_dir) / self.category / f"{self.safe_title}.html"
         return path
 
+def download_and_replace_images(soup, save_path):
+    img_dir = save_path.parent / 'images'
+    img_dir.mkdir(parents=True, exist_ok=True)
+    for img in soup.find_all('img'):
+        src = img.get('src')
+        if src and src.startswith('http'):
+            try:
+                img_data = requests.get(src, timeout=10).content
+                ext = src.split('.')[-1].split('?')[0][:5]
+                hashname = hashlib.md5(src.encode()).hexdigest()[:10]
+                local_img_name = f"{hashname}.{ext}"
+                local_img_path = img_dir / local_img_name
+                with open(local_img_path, 'wb') as f:
+                    f.write(img_data)
+                img['src'] = f"images/{local_img_name}"
+            except Exception as e:
+                print(f"Failed to download image: {src}, error: {e}")
+                continue
+
 async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_timeout=30000):
-    """Asynchronously save a single webpage to an HTML file, with 503 detection."""
+    """Asynchronously save a single webpage to an HTML file, with 503 detection and image download."""
     save_path = post.get_save_path(output_dir)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     if save_path.exists():
@@ -35,19 +57,25 @@ async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_t
         )
         page = await context.new_page()
         page.set_default_timeout(page_timeout)
-        # Detect 503 status
         response = await page.goto(post.url, wait_until='domcontentloaded')
         if response and response.status == 503:
             await context.close()
             msg = f"503 Service Unavailable detected for {post.url}. This may be due to rate limiting or server protection."
             log_error(post, msg)
             return f"Download failed (503): {post.url}"
+
         try:
             await page.wait_for_selector('article', timeout=5000)
         except:
             pass
         html_content = await page.content()
-        save_path.write_text(html_content, encoding='utf-8')
+
+        # Parse HTML, download images, and replace src with local path
+        soup = BeautifulSoup(html_content, 'html.parser')
+        download_and_replace_images(soup, save_path)
+
+        with open(save_path, 'w', encoding='utf-8') as f:
+            f.write(str(soup))
         await context.close()
         return f"Success: {post.title}"
     except Exception as e:
