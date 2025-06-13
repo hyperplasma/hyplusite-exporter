@@ -96,4 +96,5 @@ python main.py --posts-file data/posts.csv --output-dir my_html --concurrent-dow
 [LICENSE](LICENSE)
 
 ---
-Last updated: 2025-06-13 11:24:47 UTC by [@LoongBeta](https://github.com/LoongBeta)
+
+Last updated by [Akira37 (hyperplasma)](https://github.com/hyperplasma)
