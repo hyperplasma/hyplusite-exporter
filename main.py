@@ -57,7 +57,8 @@ def parse_args():
         parser.error(f"Data directory not found: {args.data_dir}")
     
     Path('logs').mkdir(exist_ok=True)
-    Path(args.output_dir).mkdir(exist_ok=True)
+    # Ensure parent directories are created for output_dir
+    Path(args.output_dir).mkdir(exist_ok=True, parents=True)
     
     return args
 
