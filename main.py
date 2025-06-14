@@ -65,7 +65,7 @@ def parse_args():
 def main():
     """Main entry point."""
     args = parse_args()
-    print("Configuration:")
+    print("Hyplusite Exporter Configuration:")
     print(f"- Data directory: {args.data_dir}")
     print(f"- Output directory: {args.output_dir}")
     print(f"- Concurrent downloads: {args.concurrent_downloads}")
