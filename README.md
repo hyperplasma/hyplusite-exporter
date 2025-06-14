@@ -16,11 +16,11 @@ Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma
 
 - Python 3.11+
 - The following Python packages (with specified versions):
-    - playwright>=1.42.0  
-    - pandas>=2.2.2  
-    - tqdm>=4.66.1
-    - beautifulsoup4>=4.12.3
-    - requests>=2.32.2
+  - playwright>=1.42.0
+  - pandas>=2.2.2
+  - tqdm>=4.66.1
+  - beautifulsoup4>=4.12.3
+  - requests>=2.32.2
 
 Install the dependencies with:
 
@@ -71,22 +71,18 @@ python main.py --data-dir data --output-dir outputs/hyplusite --concurrent-downl
 
 ### Custom Arguments
 
-- `--data-dir`: Root directory containing category/subcategory CSV files.  
-  Default: `data`
-- `--output-dir`: Directory to save the downloaded HTML files and the index page.  
-  Default: `outputs/hyplusite`
-- `--concurrent-downloads`: Number of posts to download concurrently.  
-  Default: `5`
-- `--batch-size`: Number of posts to process per batch.  
-  Default: `10`
-- `--page-timeout`: Timeout for loading a page, in milliseconds.  
+- `--data-dir`: Root directory containing category/subcategory CSV files.Default: `data`
+- `--output-dir`: Directory to save the downloaded HTML files and the index page.Default: `outputs`
+- `--concurrent-downloads`: Number of posts to download concurrently.Default: `5`
+- `--batch-size`: Number of posts to process per batch.Default: `10`
+- `--page-timeout`: Timeout for loading a page, in milliseconds.
   Default: `30000`
 
 ### Downloaded Files Structure
 
 - HTML files are saved in directories based on category/subcategory:
   ```
-  outputs/hyplusite/
+  outputs/
   ├── index.html
   └── <category>/
       └── <subcategory>/
@@ -111,7 +107,7 @@ python main.py --data-dir data --output-dir outputs/hyplusite --concurrent-downl
 ## Example
 
 ```bash
-python main.py --data-dir data --output-dir outputs/hyplusite --concurrent-downloads 10
+python main.py --data-dir data --output-dir outputs/my_posts --concurrent-downloads 5
 ```
 
 ## License
