@@ -10,16 +10,17 @@ Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma
 - Local image downloads for offline viewing
 - Error detection for 503 Service Unavailable
 - Detailed error logging
+- **Automatic tree-structured HTML index page (`index.html`) with author and timestamp meta**
 
 ## Requirements
 
 - Python 3.11+
 - The following Python packages (with specified versions):
-    - playwright==1.42.0  
-    - pandas==2.2.2  
-    - tqdm==4.66.1
-    - beautifulsoup4==4.12.3
-    - requests==2.32.2
+    - playwright>=1.42.0  
+    - pandas>=2.2.2  
+    - tqdm>=4.66.1
+    - beautifulsoup4>=4.12.3
+    - requests>=2.32.2
 
 Install the dependencies with:
 
@@ -56,7 +57,7 @@ data/数据库/官网教程.csv
 
 **Each row in a CSV represents a post for one subcategory.**
 
-Run the downloader:
+Run the downloader (default settings):
 
 ```bash
 python main.py
@@ -65,15 +66,15 @@ python main.py
 Or specify your own options:
 
 ```bash
-python main.py --data-dir data --output-dir downloads --concurrent-downloads 8 --batch-size 20 --page-timeout 20000
+python main.py --data-dir data --output-dir outputs/hyplusite --concurrent-downloads 8 --batch-size 20 --page-timeout 20000
 ```
 
 ### Custom Arguments
 
 - `--data-dir`: Root directory containing category/subcategory CSV files.  
   Default: `data`
-- `--output-dir`: Directory to save the downloaded HTML files.  
-  Default: `outputs`
+- `--output-dir`: Directory to save the downloaded HTML files and the index page.  
+  Default: `outputs/hyplusite`
 - `--concurrent-downloads`: Number of posts to download concurrently.  
   Default: `5`
 - `--batch-size`: Number of posts to process per batch.  
@@ -85,15 +86,17 @@ python main.py --data-dir data --output-dir downloads --concurrent-downloads 8 -
 
 - HTML files are saved in directories based on category/subcategory:
   ```
-  outputs/
+  outputs/hyplusite/
+  ├── index.html
   └── <category>/
       └── <subcategory>/
           ├── my-post-title.html
           └── images/
               └── <MD5-hashed-image-names>
   ```
-- External images are downloaded to an `images/` subfolder in the same directory as the HTML file
-- Image filenames are MD5-hashed from their original URLs to prevent conflicts
+- An `index.html` file is generated in the top-level output directory, containing a tree-structured index linking to all downloaded HTML files.
+- External images are downloaded to an `images/` subfolder in the same directory as the HTML file.
+  - Image filenames are MD5-hashed from their original URLs to prevent conflicts.
 
 ### Resume and Redownload
 
@@ -108,7 +111,7 @@ python main.py --data-dir data --output-dir downloads --concurrent-downloads 8 -
 ## Example
 
 ```bash
-python main.py --data-dir data --output-dir my_html --concurrent-downloads 10
+python main.py --data-dir data --output-dir outputs/hyplusite --concurrent-downloads 10
 ```
 
 ## License
@@ -117,4 +120,4 @@ python main.py --data-dir data --output-dir my_html --concurrent-downloads 10
 
 ---
 
-Last updated by [Akira37 (hyperplasma)](https://github.com/hyperplasma)
+Last updated by [LoongBeta](https://github.com/LoongBeta) on 2025-06-14
