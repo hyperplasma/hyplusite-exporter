@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='outputs',
+        default='outputs/hyplusite',
         help='Directory to save downloaded files'
     )
     
