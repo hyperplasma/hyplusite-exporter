@@ -92,19 +92,39 @@ def log_error(post, error_msg):
     with log_path.open('a', encoding='utf-8') as f:
         f.write(f"[{timestamp}] {post.title} ({post.url}): {error_msg}\n")
 
-def parse_posts_file(file_path='data/posts.csv'):
-    """Parse posts.csv and return a list of Post objects."""
-    try:
-        df = pd.read_csv(file_path)
-        return [Post(
-            url=row['url'],
-            title=row['title'],
-            category=row['category'],
-            subcategory=row['subcategory']
-        ) for _, row in df.iterrows()]
-    except Exception as e:
-        print(f"Error parsing CSV file: {str(e)}")
-        return []
+def parse_posts_file(data_dir='data'):
+    """
+    Parse category/subcategory csvs in the data directory and return a list of Post objects.
+    Directory structure:
+        data/{category}/{subcategory}.csv
+    Each CSV contains url,title columns.
+    """
+    posts = []
+    data_dir = Path(data_dir)
+    if not data_dir.exists():
+        print(f"Data directory {data_dir} does not exist.")
+        return posts
+    # Traverse all category directories
+    for category_dir in data_dir.iterdir():
+        if not category_dir.is_dir():
+            continue
+        category = category_dir.name
+        # Traverse all csvs in the category dir
+        for csv_file in category_dir.glob("*.csv"):
+            subcategory = csv_file.stem
+            try:
+                df = pd.read_csv(csv_file)
+                for _, row in df.iterrows():
+                    posts.append(Post(
+                        url=row['url'],
+                        title=row['title'],
+                        category=category,
+                        subcategory=subcategory
+                    ))
+            except Exception as e:
+                print(f"Error parsing CSV file {csv_file}: {str(e)}")
+                continue
+    return posts
 
 async def download_batch(posts, semaphore, browser, output_dir, page_timeout):
     """Asynchronously download a batch of webpages."""
@@ -123,14 +143,14 @@ async def download_batch(posts, semaphore, browser, output_dir, page_timeout):
         return await asyncio.gather(*tasks)
 
 async def download_webpages_async(
-    posts_file='data/posts.csv',
+    data_dir='data',
     concurrent_downloads=5,
     batch_size=10,
     page_timeout=30000,
     output_dir='outputs'
 ):
     """Asynchronously download all webpages."""
-    posts = parse_posts_file(posts_file)
+    posts = parse_posts_file(data_dir)
     total = len(posts)
     if total == 0:
         print("No pages found to download.")

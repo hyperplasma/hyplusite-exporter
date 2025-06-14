@@ -4,7 +4,7 @@ Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma
 
 ## Features
 
-- Bulk download of articles/posts from a CSV list
+- Bulk download of articles/posts from a category/subcategory CSV directory tree
 - Asynchronous, concurrent downloads for speed
 - Progress tracking and automatic resume
 - Local image downloads for offline viewing
@@ -30,11 +30,31 @@ playwright install chromium
 
 ## Usage
 
-All posts are listed in a CSV file  `data/posts.csv` with the following columns:
+All posts are now listed in a **directory tree of CSV files** under the `data/` folder, structured as follows:
 
-| url                               | title         | category | subcategory |
-| --------------------------------- | ------------- | -------- | ----------- |
-| `https://www.hyperplasma.top/xxx` | My Post Title | tech     | python      |
+```
+data/
+└── <category>/
+    └── <subcategory>.csv
+```
+
+Each CSV file contains these columns:
+
+| url                               | title         |
+| --------------------------------- | ------------- |
+| `https://www.hyperplasma.top/xxx` | My Post Title |
+
+**Example:**
+
+```
+data/Java/官网教程.csv
+data/Java/原理篇.csv
+data/Nodejs/官网教程.csv
+data/数据库/官网教程.csv
+...
+```
+
+**Each row in a CSV represents a post for one subcategory.**
 
 Run the downloader:
 
@@ -45,13 +65,13 @@ python main.py
 Or specify your own options:
 
 ```bash
-python main.py --posts-file data/posts.csv --output-dir downloads --concurrent-downloads 8 --batch-size 20 --page-timeout 20000
+python main.py --data-dir data --output-dir downloads --concurrent-downloads 8 --batch-size 20 --page-timeout 20000
 ```
 
 ### Custom Arguments
 
-- `--posts-file`: Path to the CSV file listing the posts to download.  
-  Default: `data/posts.csv`
+- `--data-dir`: Root directory containing category/subcategory CSV files.  
+  Default: `data`
 - `--output-dir`: Directory to save the downloaded HTML files.  
   Default: `outputs`
 - `--concurrent-downloads`: Number of posts to download concurrently.  
@@ -66,8 +86,8 @@ python main.py --posts-file data/posts.csv --output-dir downloads --concurrent-d
 - HTML files are saved in directories based on category/subcategory:
   ```
   outputs/
-  └── category/
-      └── subcategory/
+  └── <category>/
+      └── <subcategory>/
           ├── my-post-title.html
           └── images/
               └── <MD5-hashed-image-names>
@@ -88,7 +108,7 @@ python main.py --posts-file data/posts.csv --output-dir downloads --concurrent-d
 ## Example
 
 ```bash
-python main.py --posts-file data/posts.csv --output-dir my_html --concurrent-downloads 10
+python main.py --data-dir data --output-dir my_html --concurrent-downloads 10
 ```
 
 ## License

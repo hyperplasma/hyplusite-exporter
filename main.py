@@ -12,10 +12,10 @@ def parse_args():
     )
     
     parser.add_argument(
-        '--posts-file',
+        '--data-dir',
         type=str,
-        default='data/posts.csv',
-        help='CSV file path containing the list of pages to download'
+        default='data',
+        help='Directory containing category/subcategory CSV files'
     )
     parser.add_argument(
         '--concurrent-downloads',
@@ -52,9 +52,9 @@ def parse_args():
     if args.page_timeout < 1000:
         parser.error("page-timeout must be at least 1000 ms")
     
-    posts_file = Path(args.posts_file)
-    if not posts_file.exists():
-        parser.error(f"CSV file not found: {args.posts_file}")
+    data_dir = Path(args.data_dir)
+    if not data_dir.exists() or not data_dir.is_dir():
+        parser.error(f"Data directory not found: {args.data_dir}")
     
     Path('logs').mkdir(exist_ok=True)
     Path(args.output_dir).mkdir(exist_ok=True)
@@ -65,14 +65,14 @@ def main():
     """Main entry point."""
     args = parse_args()
     print("\nConfiguration:")
-    print(f"- CSV file: {args.posts_file}")
+    print(f"- Data directory: {args.data_dir}")
     print(f"- Output directory: {args.output_dir}")
     print(f"- Concurrent downloads: {args.concurrent_downloads}")
     print(f"- Batch size: {args.batch_size}")
     print(f"- Page timeout: {args.page_timeout} ms")
     try:
         asyncio.run(download_webpages_async(
-            posts_file=args.posts_file,
+            data_dir=args.data_dir,
             concurrent_downloads=args.concurrent_downloads,
             batch_size=args.batch_size,
             page_timeout=args.page_timeout,
