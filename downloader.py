@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 import pandas as pd
+import datetime
 from datetime import datetime
 import asyncio
 from playwright.async_api import async_playwright
@@ -9,20 +10,35 @@ import requests
 from bs4 import BeautifulSoup
 import hashlib
 from collections import defaultdict
+from urllib.parse import urlparse
+import os
 
 class Post:
     def __init__(self, url, title, category, subcategory=None):
         self.url = url
         self.title = title
         self.category = category
-        self.subcategory = subcategory
+        self.subcategory = subcategory if subcategory else ""
         self.safe_title = re.sub(r'[<>:"/\\|?*]', '_', title)
     
-    def get_save_path(self, base_dir='outputs'):
+    def get_save_path(self, base_dir='outputs/hyplusite'):
+        """
+        Generate save path for the post.
+        Now supports multiple directory levels by splitting subcategory on '/'
+        Example: if subcategory is 'Spring/Core/IoC', it will create corresponding nested directories
+        """
+        # Start with base directory and category
+        parts = [base_dir, self.category]
+        
+        # Add subcategory parts if they exist (split by /)
         if self.subcategory:
-            path = Path(base_dir) / self.category / self.subcategory / f"{self.safe_title}.html"
-        else:
-            path = Path(base_dir) / self.category / f"{self.safe_title}.html"
+            parts.extend(self.subcategory.split('/'))
+            
+        # Convert all path parts to safe names
+        safe_parts = [re.sub(r'[<>:"/\\|?*]', '_', part.strip()) for part in parts if part.strip()]
+        
+        # Combine all parts and add filename
+        path = Path(*safe_parts) / f"{self.safe_title}.html"
         return path
 
 def download_and_replace_images(soup, save_path):
@@ -33,10 +49,17 @@ def download_and_replace_images(soup, save_path):
         if src and src.startswith('http'):
             try:
                 img_data = requests.get(src, timeout=10).content
-                ext = src.split('.')[-1].split('?')[0][:5]
+                
+                # Better extension handling
+                urlp = urlparse(src)
+                _, ext = os.path.splitext(urlp.path)
+                if not ext or len(ext) > 5:
+                    ext = '.jpg'
+                    
                 hashname = hashlib.md5(src.encode()).hexdigest()[:10]
-                local_img_name = f"{hashname}.{ext}"
+                local_img_name = f"{hashname}{ext}"
                 local_img_path = img_dir / local_img_name
+                
                 with open(local_img_path, 'wb') as f:
                     f.write(img_data)
                 img['src'] = f"images/{local_img_name}"
@@ -44,7 +67,85 @@ def download_and_replace_images(soup, save_path):
                 print(f"Failed to download image: {src}, error: {e}")
                 continue
 
-async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_timeout=30000):
+def build_index_tree(posts, output_dir):
+    """
+    Build a tree structure for index page.
+    Now supports multiple directory levels by splitting subcategory on '/'.
+    """
+    def nested_dict():
+        return defaultdict(nested_dict)
+        
+    tree = nested_dict()
+    output_dir = Path(output_dir)
+    
+    for post in posts:
+        html_path = post.get_save_path(output_dir)
+        rel_path = str(html_path.relative_to(output_dir)).replace('\\', '/')
+        
+        # Navigate to the correct nested dictionary
+        current = tree[post.category]
+        if post.subcategory:
+            for part in post.subcategory.split('/'):
+                current = current[part]
+        
+        # Store the title and path at the leaf level
+        if 'files' not in current:
+            current['files'] = []
+        current['files'].append((post.title, rel_path))
+    
+    return tree
+
+def write_index_html(tree, output_dir):
+    """
+    Write index.html with multi-level directory structure.
+    """
+    def write_tree(node, indent=0):
+        lines = []
+        # Sort items: directories first, then files
+        items = sorted(node.items(), key=lambda x: (not isinstance(x[1], defaultdict), x[0]))
+        
+        for name, content in items:
+            if name == 'files':
+                # Sort files by title
+                for title, path in sorted(content, key=lambda x: x[0]):
+                    lines.append(f'{"  " * indent}<li><a href="{path}">{title}</a></li>')
+            else:
+                lines.append(f'{"  " * indent}<li><strong>{name}</strong>\n{"  " * indent}<ul>')
+                lines.extend(write_tree(content, indent + 1))
+                lines.append(f'{"  " * indent}</ul></li>')
+        return lines
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    lines = [
+        '<!DOCTYPE html>',
+        '<html lang="zh-CN">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<title>Index - Hyplusite Exporter</title>',
+        '<meta name="author" content="LoongBeta">',
+        f'<meta name="generated" content="{now_str}">',
+        '<style>',
+        'ul{margin:0 0 0 1.5em;padding:0;}',
+        'li{margin:.2em 0;}',
+        'strong{color:#333;font-size:1.1em;}',
+        'a{color:#0366d6;text-decoration:none;}',
+        'a:hover{text-decoration:underline;}',
+        '</style>',
+        '</head>',
+        '<body>',
+        '<h1>Hyperplasma</h1>',
+        f'<p>Interactive book pages generated by Hyplusite Exporter on {now_str}. Enjoy reading anytime!</p>',
+        '<ul>'
+    ]
+    
+    lines.extend(write_tree(tree))
+    lines.extend(['</ul>', '</body>', '</html>'])
+    
+    index_path = Path(output_dir) / "index.html"
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write('\n'.join(lines))
+
+async def save_webpage_to_html_async(post, browser, output_dir='outputs/hyplusite', page_timeout=30000):
     """Asynchronously save a single webpage to an HTML file, with 503 detection and image download."""
     save_path = post.get_save_path(output_dir)
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +172,6 @@ async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_t
             pass
         html_content = await page.content()
 
-        # Parse HTML, download images, and replace src with local path
         soup = BeautifulSoup(html_content, 'html.parser')
         download_and_replace_images(soup, save_path)
 
@@ -86,7 +186,7 @@ async def save_webpage_to_html_async(post, browser, output_dir='outputs', page_t
 
 def log_error(post, error_msg):
     """Log errors to a log file."""
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_dir = Path('logs')
     log_dir.mkdir(exist_ok=True)
     log_path = log_dir / 'error_log.txt'
@@ -96,23 +196,26 @@ def log_error(post, error_msg):
 def parse_posts_file(data_dir='data'):
     """
     Parse category/subcategory csvs in the data directory and return a list of Post objects.
-    Directory structure:
-        data/{category}/{subcategory}.csv
-    Each CSV contains url,title columns.
+    Now supports nested subcategories using '/' as delimiter.
     """
     posts = []
     data_dir = Path(data_dir)
     if not data_dir.exists():
         print(f"Data directory {data_dir} does not exist.")
         return posts
+    
     # Traverse all category directories
     for category_dir in data_dir.iterdir():
         if not category_dir.is_dir():
             continue
         category = category_dir.name
-        # Traverse all csvs in the category dir
-        for csv_file in category_dir.glob("*.csv"):
-            subcategory = csv_file.stem
+        
+        # Recursively traverse all csvs in the category dir
+        for csv_file in category_dir.rglob("*.csv"):
+            # Get relative path from category dir to csv file, excluding the csv filename
+            rel_path = csv_file.relative_to(category_dir).parent
+            subcategory = str(rel_path).replace('\\', '/') if str(rel_path) != '.' else ''
+            
             try:
                 df = pd.read_csv(csv_file)
                 for _, row in df.iterrows():
@@ -126,52 +229,6 @@ def parse_posts_file(data_dir='data'):
                 print(f"Error parsing CSV file {csv_file}: {str(e)}")
                 continue
     return posts
-
-def build_index_tree(posts, output_dir):
-    """
-    Build a tree structure: {category: {subcategory: [(title, relpath), ...]}}
-    relpath is relative path from output_dir/index.html to HTML file.
-    """
-    tree = defaultdict(lambda: defaultdict(list))
-    output_dir = Path(output_dir)
-    for post in posts:
-        html_path = post.get_save_path(output_dir)
-        rel_path = html_path.relative_to(output_dir)
-        tree[post.category][post.subcategory].append((post.title, str(rel_path).replace('\\', '/')))
-    return tree
-
-def write_index_html(tree, output_dir):
-    """
-    Write index.html in output_dir, tree is {category: {subcategory: [(title, relpath), ...]}}
-    """
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    lines = [
-        '<!DOCTYPE html>',
-        '<html lang="zh-CN">',
-        '<head>',
-        '<meta charset="UTF-8">',
-        '<title>Hyplus Index - Hyplusite Exporter</title>',
-        '<meta name="author" content="Akira37">',
-        f'<meta name="generated" content="{now_str}">',
-        '<style>ul{margin:0 0 0 1.5em;padding:0;}li{margin:.2em 0;}</style>',
-        '</head>',
-        '<body>',
-        '<h1>Hyplus Index</h1>',
-        f'<p>Interactive book pages generated by Hyplusite Exporter on {now_str}. Enjoy your reading experience at any time!</p>',
-        '<ul>'
-    ]
-    for category in sorted(tree.keys()):
-        lines.append(f'<li><strong>{category}</strong>\n<ul>')
-        for subcategory in sorted(tree[category].keys()):
-            lines.append(f'<li><span>{subcategory}</span>\n<ul>')
-            for title, relpath in sorted(tree[category][subcategory], key=lambda x: x[0]):
-                lines.append(f'<li><a href="{relpath}">{title}</a></li>')
-            lines.append('</ul></li>')
-        lines.append('</ul></li>')
-    lines.append('</ul>\n</body>\n</html>')
-    index_path = Path(output_dir) / "index.html"
-    with open(index_path, "w", encoding="utf-8") as f:
-        f.write('\n'.join(lines))
 
 async def download_batch(posts, semaphore, browser, output_dir, page_timeout):
     """Asynchronously download a batch of webpages."""
@@ -194,7 +251,7 @@ async def download_webpages_async(
     concurrent_downloads=5,
     batch_size=10,
     page_timeout=30000,
-    output_dir='outputs'
+    output_dir='outputs/hyplusite'
 ):
     """Asynchronously download all webpages and generate a tree index."""
     posts = parse_posts_file(data_dir)
@@ -203,14 +260,17 @@ async def download_webpages_async(
         print("No pages found to download.")
         return
     print(f"Found {total} pages to download.")
+    
     log_dir = Path('logs')
     log_dir.mkdir(exist_ok=True)
     progress_file = log_dir / 'download_progress.txt'
+    
     if progress_file.exists():
         last_index = int(progress_file.read_text())
         posts = posts[last_index:]
     else:
         last_index = 0
+        
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -223,6 +283,7 @@ async def download_webpages_async(
                 ]
             )
             semaphore = asyncio.Semaphore(concurrent_downloads)
+            
             with tqdm(total=len(posts), desc="Download progress") as pbar:
                 for i in range(0, len(posts), batch_size):
                     batch = posts[i:i + batch_size]
@@ -233,22 +294,25 @@ async def download_webpages_async(
                         output_dir,
                         page_timeout
                     )
-                    progress_file.write_text(str(last_index + i + len(batch)), encoding='utf-8')
+                    progress_file.write_text(str(last_index + i + len(batch)))
                     pbar.update(len(batch))
                     for result in results:
                         if "503" in result or result.startswith("Download failed"):
                             print(f"\n{result}")
+                            
             await browser.close()
-        # After all downloads, generate index.html
+            
+        # After all downloads, generate index.html with the full tree structure
         tree = build_index_tree(parse_posts_file(data_dir), output_dir)
         write_index_html(tree, output_dir)
         print(f"\nIndex page generated at: {Path(output_dir) / 'index.html'}")
+        
     except KeyboardInterrupt:
         print("\nUser interrupted download")
     except Exception as e:
         print(f"\nError occurred: {str(e)}")
 
-async def download_single_page(url, output_dir='outputs', page_timeout=30000):
+async def download_single_page(url, output_dir='outputs/hyplusite', page_timeout=30000):
     """Download a single webpage."""
     try:
         async with async_playwright() as p:
@@ -266,6 +330,5 @@ async def download_single_page(url, output_dir='outputs', page_timeout=30000):
         print(f"Download failed: {str(e)}")
 
 if __name__ == "__main__":
-    # Download single page example
     url = "https://www.hyperplasma.top/hyplus"
     asyncio.run(download_single_page(url))
