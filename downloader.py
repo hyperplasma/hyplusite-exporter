@@ -65,7 +65,8 @@ def build_index_tree(posts, output_dir):
                     current = current[part.strip()]
         if 'files' not in current:
             current['files'] = []
-        current['files'].append((str(post.title), rel_path))
+        # 追加原网址
+        current['files'].append((str(post.title), rel_path, str(post.url)))
     return tree
 
 def write_index_html(tree, output_dir):
@@ -74,14 +75,14 @@ def write_index_html(tree, output_dir):
         items = sorted(node.items(), key=lambda x: (not isinstance(x[1], defaultdict), x[0]))
         for name, content in items:
             if name == 'files':
-                for title, path in sorted(content, key=lambda x: x[0]):
-                    lines.append(f'{"  " * indent}<li><a href="{path}">{title}</a></li>')
+                for title, path, url in sorted(content, key=lambda x: x[0]):
+                    # 在每一项后追加原始网址
+                    lines.append(f'{"  " * indent}<li><a href="{path}">{title}</a> (<a href="{url}" target="_blank">{url}</a>)</li>')
             else:
                 lines.append(f'{"  " * indent}<li><strong>{name}</strong>\n{"  " * indent}<ul>')
                 lines.extend(write_tree(content, indent + 1))
                 lines.append(f'{"  " * indent}</ul></li>')
         return lines
-    # 用本地时间
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = [
         '<!DOCTYPE html>',

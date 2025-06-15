@@ -1,6 +1,6 @@
 # Hyplusite Exporter
 
-Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma.top)) as genteelly as you want.
+Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma.top)) or other sites as genteelly as you want.
 
 ## Features
 
