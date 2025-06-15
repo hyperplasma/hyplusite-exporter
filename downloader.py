@@ -13,17 +13,20 @@ from urllib.parse import urlparse
 import os
 
 class Post:
-    def __init__(self, url, title, category, subcategory=None):
+    def __init__(self, url, title, category, csv_subdir=None, csv_filename=None):
         self.url = url
         self.title = title
         self.category = str(category).strip() if category else ""
-        self.subcategory = str(subcategory).strip() if subcategory else ""
+        self.csv_subdir = str(csv_subdir).strip() if csv_subdir else ""
+        self.csv_filename = str(csv_filename).strip() if csv_filename else ""
         self.safe_title = re.sub(r'[<>:"/\\|?*]', '_', str(title))
     
     def get_save_path(self, base_dir='outputs/hyplusite'):
         parts = [base_dir, self.category]
-        if self.subcategory:
-            parts.extend(str(part).strip() for part in self.subcategory.split('/') if str(part).strip())
+        if self.csv_subdir:
+            parts.extend(str(part).strip() for part in self.csv_subdir.split('/') if str(part).strip())
+        if self.csv_filename:
+            parts.append(self.csv_filename)
         safe_parts = [re.sub(r'[<>:"/\\|?*]', '_', str(part)) for part in parts if part]
         path = Path(*safe_parts) / f"{self.safe_title}.html"
         return path
@@ -59,13 +62,14 @@ def build_index_tree(posts, output_dir):
         html_path = post.get_save_path(output_dir)
         rel_path = str(html_path.relative_to(output_dir)).replace('\\', '/')
         current = tree[post.category]
-        if post.subcategory:
-            for part in str(post.subcategory).split('/'):
+        if post.csv_subdir:
+            for part in post.csv_subdir.split('/'):
                 if part.strip():
                     current = current[part.strip()]
+        if post.csv_filename:
+            current = current[post.csv_filename]
         if 'files' not in current:
             current['files'] = []
-        # 追加原网址
         current['files'].append((str(post.title), rel_path, str(post.url)))
     return tree
 
@@ -76,8 +80,7 @@ def write_index_html(tree, output_dir):
         for name, content in items:
             if name == 'files':
                 for title, path, url in sorted(content, key=lambda x: x[0]):
-                    # 在每一项后追加原始网址
-                    lines.append(f'{"  " * indent}<li><a href="{path}">{title}</a> (<a href="{url}" target="_blank">{url}</a>)</li>')
+                    lines.append(f'{"  " * indent}<li><a href="{path}">{title}</a> - <a href="{url}" target="_blank">{url}</a></li>')
             else:
                 lines.append(f'{"  " * indent}<li><strong>{name}</strong>\n{"  " * indent}<ul>')
                 lines.extend(write_tree(content, indent + 1))
@@ -174,7 +177,8 @@ def parse_posts_file(data_dir='data'):
         category = category_dir.name
         for csv_file in category_dir.rglob("*.csv"):
             rel_path = csv_file.relative_to(category_dir).parent
-            subcategory = str(rel_path).replace('\\', '/') if str(rel_path) != '.' else ''
+            csv_subdir = str(rel_path).replace('\\', '/') if str(rel_path) != '.' else ''
+            csv_filename = csv_file.stem  # without .csv
             try:
                 df = pd.read_csv(csv_file)
                 for _, row in df.iterrows():
@@ -182,7 +186,8 @@ def parse_posts_file(data_dir='data'):
                         url=row['url'],
                         title=row['title'],
                         category=category,
-                        subcategory=subcategory
+                        csv_subdir=csv_subdir,
+                        csv_filename=csv_filename
                     ))
             except Exception as e:
                 print(f"Error parsing CSV file {str(csv_file)}: {str(e)}")
