@@ -2,7 +2,7 @@
 
 Download posts from **Hyplusite** ([www.hyperplasma.top](https://www.hyperplasma.top)) or other sites as genteelly as you want.
 
-[HyFetcher](https://github.com/hyperplasma/hyfetcher) is the Rust implementation of this Python script, offering enhanced performance.
+[HyFetcher](https://github.com/hyperplasma/hyfetcher) is the Rust implementation of these Python scripts, offering enhanced performance.
 
 ## Features
 
